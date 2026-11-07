@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🎮 اقلب واكتشف - لعبة الذاكرة</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Comic Sans MS', 'Tahoma', sans-serif; }
+  body {
+    min-height: 100vh;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+    display: flex; justify-content: center; align-items: center;
+    padding: 15px; overflow-x: hidden;
+  }
+  .container {
+    background: rgba(255,255,255,0.95);
+    border-radius: 25px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    padding: 25px;
+    width: 100%; max-width: 700px;
+    position: relative;
+  }
+  .screen { display: none; animation: fadeIn 0.5s ease; }
+  .screen.active { display: block; }
+  @keyframes fadeIn { from {opacity:0; transform:translateY(20px);} to {opacity:1; transform:translateY(0);} }
+
+  h1 {
+    text-align: center;
+    font-size: 2.5em;
+    background: linear-gradient(45deg, #ff6b6b, #feca57, #48dbfb, #ff9ff3);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 10px;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+  }
+  .subtitle { text-align: center; color: #555; font-size: 1.2em; margin-bottom: 25px; }
+
+  .btn {
+    display: block;
+    width: 100%;
+    padding: 18px;
+    margin: 12px 0;
+    font-size: 1.3em;
+    font-weight: bold;
+    border: none;
+    border-radius: 15px;
+    cursor: pointer;
+    transition: all 0.3s;
+    color: white;
+    box-shadow: 0 6px 15px rgba(0,0,0,0.2);
+  }
+  .btn:hover { transform: translateY(-3px); box-shadow: 0 10px 25px rgba(0,0,0,0.3); }
+  .btn:active { transform: translateY(0); }
+  .btn-primary { background: linear-gradient(45deg, #11998e, #38ef7d); }
+  .btn-warning { background: linear-gradient(45deg, #f093fb, #f5576c); }
+  .btn-info    { background: linear-gradient(45deg, #4facfe, #00f2fe); }
+  .btn-back    { background: linear-gradient(45deg, #a8edea, #fed6e3); color: #333; }
+
+  .stats-bar {
+    display: flex;
+    justify-content: space-around;
+    background: linear-gradient(45deg, #ffecd2, #fcb69f);
+    padding: 12px;
+    border-radius: 15px;
+    margin-bottom: 15px;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .stat {
+    text-align: center;
+    font-weight: bold;
+    color: #c0392b;
+    font-size: 1.1em;
+  }
+  .stat span { display: block; font-size: 1.4em; color: #2c3e50; }
+
+  .board {
+    display: grid;
+    gap: 10px;
+    justify-content: center;
+    margin: 15px auto;
+  }
+  .board.easy   { grid-template-columns: repeat(3, 1fr); max-width: 360px; }
+  .board.medium { grid-template-columns: repeat(4, 1fr); max-width: 480px; }
+  .board.hard   { grid-template-columns: repeat(4, 1fr); max-width: 480px; }
+
+  .card {
+    aspect-ratio: 1;
+    perspective: 1000px;
+    cursor: pointer;
+    position: relative;
+  }
+  .card-inner {
+    position: relative;
+    width: 100%; height: 100%;
+    transition: transform 0.6s;
+    transform-style: preserve-3d;
+  }
+  .card.flipped .card-inner { transform: rotateY(180deg); }
+  .card.matched .card-inner { transform: rotateY(180deg); }
+  .card.matched { animation: matchPulse 0.6s ease; }
+  @keyframes matchPulse {
+    0%,100% { transform: scale(1); }
+    50% { transform: scale(1.15); }
+  }
+  .card.wrong .card-inner { animation: shake 0.5s; }
+  @keyframes shake {
+    0%,100% { transform: rotateY(180deg) translateX(0); }
+    25% { transform: rotateY(180deg) translateX(-8px); }
+    75% { transform: rotateY(180deg) translateX(8px); }
+  }
+  .card-face {
+    position: absolute;
+    width: 100%; height: 100%;
+    backface-visibility: hidden;
+    border-radius: 15px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 3em;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+  }
+  .card-front {
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: white;
+    font-size: 2.5em;
+  }
+  .card-front::before {
+    content: "❓";
+    animation: bounce 2s infinite;
+  }
+  @keyframes bounce {
+    0%,100% { transform: translateY(0); }
+    50% { transform: translateY(-5px); }
+  }
+  .card-back {
+    background: linear-gradient(135deg, #fff, #f0f0f0);
+    transform: rotateY(180deg);
+  }
+  .card.matched .card-back {
+    background: linear-gradient(135deg, #a8edea, #fed6e3);
+    border: 3px solid #11998e;
+  }
+  .card-label {
+    position: absolute;
+    bottom: 5px;
+    width: 100%;
+    text-align: center;
+    font-size: 0.35em;
+    color: #333;
+    font-weight: bold;
+  }
+
+  .controls {
+    display: flex;
+    gap: 10px;
+    margin-top: 15px;
+    flex-wrap: wrap;
+  }
+  .controls .btn { flex: 1; min-width: 120px; margin: 0; padding: 12px; font-size: 1em; }
+
+  .win-screen { text-align: center; }
+  .win-screen h2 { font-size: 2.5em; color: #11998e; margin: 20px 0; }
+  .stars { font-size: 3em; margin: 15px 0; }
+  .win-stats {
+    background: #f0f8ff;
+    padding: 20px;
+    border-radius: 15px;
+    margin: 20px 0;
+    font-size: 1.2em;
+    line-height: 2;
+  }
+
+  .sound-toggle {
+    position: absolute;
+    top: 15px;
+    left: 15px;
+    background: white;
+    border: 2px solid #764ba2;
+    border-radius: 50%;
+    width: 45px; height: 45px;
+    font-size: 1.3em;
+    cursor: pointer;
+    z-index: 10;
+  }
+
+  .confetti {
+    position: fixed;
+    width: 10px; height: 10px;
+    pointer-events: none;
+    animation: fall 3s linear forwards;
+  }
+  @keyframes fall {
+    to { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+  }
+
+  .level-desc {
+    background: #fff3cd;
+    padding: 10px;
+    border-radius: 10px;
+    text-align: center;
+    margin: 10px 0;
+    color: #856404;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <button class="sound-toggle" id="soundToggle" title="تشغيل/إيقاف الصوت">🔊</button>
+
+  <!-- الشاشة الرئيسية -->
+  <div class="screen active" id="homeScreen">
+    <h1>🎴 اقلب واكتشف 🎴</h1>
+    <p class="subtitle">لعبة الذاكرة الممتعة للأطفال</p>
+    <div style="background:#f0f8ff; padding:15px; border-radius:15px; margin:20px 0; text-align:center; line-height:1.8;">
+      <p style="font-size:1.1em;">🎯 <b>القواعد:</b></p>
+      <p>• اقلب بطاقتين في كل محاولة</p>
+      <p>• ابحث عن الصورتين المتطابقتين</p>
+      <p>• بعض الصور تبدأ بحرف <b style="color:#e74c3c;">(ت)</b> 🌟</p>
+    </div>
+    <button class="btn btn-primary" onclick="showScreen('levelScreen')">🚀 ابدأ اللعب</button>
+    <button class="btn btn-info" onclick="showScreen('howScreen')">📖 كيف ألعب؟</button>
+  </div>
+
+  <!-- شاشة كيفية اللعب -->
+  <div class="screen" id="howScreen">
+    <h1>📖 كيف ألعب؟</h1>
+    <div style="line-height:2.2; font-size:1.15em; padding:15px;">
+      <p>1️⃣ ستظهر أمامك بطاقات مقلوبة.</p>
+      <p>2️⃣ اضغط على أي بطاقتين لقلبهما.</p>
+      <p>3️⃣ إذا تطابقت الصور ➡️ تبقى مفتوحة ✅</p>
+      <p>4️⃣ إذا اختلفتا ➡️ تنقلبان مجدداً ❌</p>
+      <p>5️⃣ اكشف كل الأزواج لتفوز! 🏆</p>
+      <p style="margin-top:15px; background:#fff3cd; padding:10px; border-radius:10px;">
+        💡 <b>نصيحة:</b> انتبه لأسماء الأشياء، بعضها يبدأ بحرف <b>تاء</b>!
+      </p>
+    </div>
+    <button class="btn btn-back" onclick="showScreen('homeScreen')">🔙 رجوع</button>
+  </div>
+
+  <!-- شاشة اختيار المستوى -->
+  <div class="screen" id="levelScreen">
+    <h1>🎚️ اختر المستوى</h1>
+    <button class="btn btn-primary" onclick="startGame('easy')">
+      🌱 سهل (6 بطاقات)
+      <div class="level-desc">3 أزواج - للمبتدئين</div>
+    </button>
+    <button class="btn btn-info" onclick="startGame('medium')">
+      🌟 متوسط (12 بطاقة)
+      <div class="level-desc">6 أزواج - للمستوى المتوسط</div>
+    </button>
+    <button class="btn btn-warning" onclick="startGame('hard')">
+      🔥 صعب (16 بطاقة)
+      <div class="level-desc">8 أزواج - للمتقدمين</div>
+    </button>
+    <button class="btn btn-back" onclick="showScreen('homeScreen')">🔙 رجوع</button>
+  </div>
+
+  <!-- شاشة اللعب -->
+  <div class="screen" id="gameScreen">
+    <h1 id="gameTitle">🎮 العب الآن</h1>
+    <div class="stats-bar">
+      <div class="stat">⏱️ الوقت<span id="timer">0</span></div>
+      <div class="stat">🎯 المحاولات<span id="moves">0</span></div>
+      <div class="stat">✅ التطابقات<span id="matches">0/0</span></div>
+    </div>
+    <div class="board" id="board"></div>
+    <div class="controls">
+      <button class="btn btn-back" onclick="confirmHome()">🏠 الرئيسية</button>
+      <button class="btn btn-info" onclick="restartGame()">🔄 إعادة</button>
+    </div>
+  </div>
+
+  <!-- شاشة الفوز -->
+  <div class="screen" id="winScreen">
+    <div class="win-screen">
+      <h1>🎉 مبروك! 🎉</h1>
+      <h2>لقد فزت!</h2>
+      <div class="stars" id="stars">⭐⭐⭐</div>
+      <div class="win-stats">
+        <p>⏱️ الوقت: <b id="finalTime">0</b> ثانية</p>
+        <p>🎯 عدد المحاولات: <b id="finalMoves">0</b></p>
+        <p>🏆 المستوى: <b id="finalLevel">-</b></p>
+      </div>
+      <button class="btn btn-primary" onclick="showScreen('levelScreen')">🎮 العب مرة أخرى</button>
+      <button class="btn btn-back" onclick="showScreen('homeScreen')">🏠 الرئيسية</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============ المؤثرات الصوتية (Web Audio API) ============
+let audioCtx = null;
+let soundEnabled = true;
+
+function initAudio() {
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+}
+
+function playTone(freq, duration, type='sine', volume=0.3) {
+  if (!soundEnabled) return;
+  initAudio();
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = type;
+  osc.frequency.value = freq;
+  gain.gain.setValueAtTime(volume, audioCtx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  osc.start();
+  osc.stop(audioCtx.currentTime + duration);
+}
+
+function soundFlip()   { playTone(600, 0.1, 'sine', 0.2); }
+function soundMatch()  {
+  playTone(523, 0.15, 'sine', 0.3);  // C
+  setTimeout(()=>playTone(659, 0.15, 'sine', 0.3), 100); // E
+  setTimeout(()=>playTone(784, 0.25, 'sine', 0.3), 200); // G
+}
+function soundWrong()  {
+  playTone(200, 0.15, 'sawtooth', 0.2);
+  setTimeout(()=>playTone(150, 0.2, 'sawtooth', 0.2), 100);
+}
+function soundWin() {
+  const notes = [523, 659, 784, 1047];
+  notes.forEach((n,i)=> setTimeout(()=>playTone(n, 0.3, 'triangle', 0.3), i*150));
+}
+function soundClick()  { playTone(800, 0.05, 'square', 0.1); }
+
+document.getElementById('soundToggle').onclick = () => {
+  soundEnabled = !soundEnabled;
+  document.getElementById('soundToggle').textContent = soundEnabled ? '🔊' : '🔇';
+  if (soundEnabled) soundClick();
+};
+
+// ============ بيانات اللعبة ============
+const allCards = [
+  // تبدأ بحرف تاء
+  { emoji: '🍎', name: 'تفاحة',  startsWithTa: true  },
+  { emoji: '🐊', name: 'تمساح',  startsWithTa: true  },
+  { emoji: '👑', name: 'تاج',    startsWithTa: true  },
+  { emoji: '🍅', name: 'طماطم',  startsWithTa: true  },
+  { emoji: '🪘', name: 'طبلة',   startsWithTa: true  },
+  { emoji: '🫐', name: 'توت',    startsWithTa: true  },
+  // صور أخرى
+  { emoji: '🚗', name: 'سيارة',  startsWithTa: false },
+  { emoji: '⚽', name: 'كرة',    startsWithTa: false },
+  { emoji: '🌙', name: 'قمر',    startsWithTa: false },
+  { emoji: '☀️', name: 'شمس',    startsWithTa: false },
+  { emoji: '🐟', name: 'سمكة',   startsWithTa: false },
+  { emoji: '🌺', name: 'وردة',   startsWithTa: false },
+  { emoji: '🐘', name: 'فيل',    startsWithTa: false },
+  { emoji: '🦁', name: 'أسد',    startsWithTa: false }
+];
+
+const levels = {
+  easy:   { pairs: 3, taCount: 2, label: 'سهل'   },
+  medium: { pairs: 6, taCount: 3, label: 'متوسط' },
+  hard:   { pairs: 8, taCount: 4, label: 'صعب'   }
+};
+
+let currentLevel = 'easy';
+let flippedCards = [];
+let matchedCount = 0;
+let totalPairs = 0;
+let moves = 0;
+let timer = 0;
+let timerInterval = null;
+let lockBoard = false;
+
+// ============ التنقل بين الشاشات ============
+function showScreen(id) {
+  soundClick();
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  if (id !== 'gameScreen' && timerInterval) {
+    clearInterval(timerInterval);
+    timerInterval = null;
+  }
+}
+
+function confirmHome() {
+  if (confirm('هل تريد العودة للرئيسية؟ ستفقد تقدمك الحالي.')) {
+    showScreen('homeScreen');
+  }
+}
+
+// ============ بدء اللعبة ============
+function startGame(level) {
+  currentLevel = level;
+  const cfg = levels[level];
+  totalPairs = cfg.pairs;
+  matchedCount = 0;
+  moves = 0;
+  timer = 0;
+  flippedCards = [];
+  lockBoard = false;
+
+  // اختيار البطاقات: نضمن وجود بعض الصور التي تبدأ بـ(ت)
+  const taCards = allCards.filter(c => c.startsWithTa);
+  const otherCards = allCards.filter(c => !c.startsWithTa);
+  const selectedTa = shuffle(taCards).slice(0, Math.min(cfg.taCount, cfg.pairs));
+  const remaining = cfg.pairs - selectedTa.length;
+  const selectedOther = shuffle(otherCards).slice(0, remaining);
+  const selected = [...selectedTa, ...selectedOther];
+
+  // إنشاء زوجين من كل بطاقة وخلطها
+  let deck = [];
+  selected.forEach(card => {
+    deck.push({...card});
+    deck.push({...card});
+  });
+  deck = shuffle(deck);
+
+  // بناء اللوحة
+  const board = document.getElementById('board');
+  board.className = 'board ' + level;
+  board.innerHTML = '';
+  deck.forEach((card, idx) => {
+    const cardEl = document.createElement('div');
+    cardEl.className = 'card';
+    cardEl.dataset.name = card.name;
+    cardEl.dataset.index = idx;
+    cardEl.innerHTML = `
+      <div class="card-inner">
+        <div class="card-face card-front"></div>
+        <div class="card-face card-back">
+          <div>${card.emoji}</div>
+          <div class="card-label">${card.name}</div>
+        </div>
+      </div>
+    `;
+    cardEl.onclick = () => flipCard(cardEl);
+    board.appendChild(cardEl);
+  });
+
+  // تحديث الإحصائيات
+  document.getElementById('gameTitle').textContent = `🎮 المستوى: ${cfg.label}`;
+  document.getElementById('moves').textContent = '0';
+  document.getElementById('matches').textContent = `0/${totalPairs}`;
+  document.getElementById('timer').textContent = '0';
+
+  // بدء المؤقت
+  if (timerInterval) clearInterval(timerInterval);
+  timerInterval = setInterval(() => {
+    timer++;
+    document.getElementById('timer').textContent = timer;
+  }, 1000);
+
+  showScreen('gameScreen');
+}
+
+function restartGame() {
+  soundClick();
+  startGame(currentLevel);
+}
+
+// ============ منطق القلب ============
+function flipCard(cardEl) {
+  if (lockBoard) return;
+  if (cardEl.classList.contains('flipped')) return;
+  if (cardEl.classList.contains('matched')) return;
+  if (flippedCards.length >= 2) return;
+
+  cardEl.classList.add('flipped');
+  flippedCards.push(cardEl);
+  soundFlip();
+
+  if (flippedCards.length === 2) {
+    moves++;
+    document.getElementById('moves').textContent = moves;
+    checkMatch();
+  }
+}
+
+function checkMatch() {
+  const [c1, c2] = flippedCards;
+  const match = c1.dataset.name === c2.dataset.name;
+
+  if (match) {
+    setTimeout(() => {
+      c1.classList.add('matched');
+      c2.classList.add('matched');
+      c1.classList.remove('flipped');
+      c2.classList.remove('flipped');
+      matchedCount++;
+      document.getElementById('matches').textContent = `${matchedCount}/${totalPairs}`;
+      soundMatch();
+      flippedCards = [];
+
+      if (matchedCount === totalPairs) {
+        setTimeout(winGame, 600);
+      }
+    }, 400);
+  } else {
+    lockBoard = true;
+    setTimeout(() => {
+      c1.classList.add('wrong');
+      c2.classList.add('wrong');
+      soundWrong();
+    }, 500);
+    setTimeout(() => {
+      c1.classList.remove('flipped', 'wrong');
+      c2.classList.remove('flipped', 'wrong');
+      flippedCards = [];
+      lockBoard = false;
+    }, 1300);
+  }
+}
+
+// ============ الفوز ============
+function winGame() {
+  clearInterval(timerInterval);
+  timerInterval = null;
+  soundWin();
+  launchConfetti();
+
+  // حساب النجوم
+  const optimal = totalPairs;
+  let stars = '⭐';
+  if (moves <= optimal * 1.5) stars = '⭐⭐⭐';
+  else if (moves <= optimal * 2.5) stars = '⭐⭐';
+
+  document.getElementById('finalTime').textContent = timer;
+  document.getElementById('finalMoves').textContent = moves;
+  document.getElementById('finalLevel').textContent = levels[currentLevel].label;
+  document.getElementById('stars').textContent = stars;
+
+  showScreen('winScreen');
+}
+
+// ============ الاحتفال بالقصاصات ============
+function launchConfetti() {
+  const colors = ['#ff6b6b','#feca57','#48dbfb','#1dd1a1','#f368e0','#ff9f43'];
+  for (let i = 0; i < 60; i++) {
+    const c = document.createElement('div');
+    c.className = 'confetti';
+    c.style.left = Math.random() * 100 + 'vw';
+    c.style.top = '-20px';
+    c.style.background = colors[Math.floor(Math.random()*colors.length)];
+    c.style.animationDelay = Math.random() * 2 + 's';
+    c.style.borderRadius = Math.random() > 0.5 ? '50%' : '0';
+    document.body.appendChild(c);
+    setTimeout(() => c.remove(), 5000);
+  }
+}
+
+// ============ أدوات ============
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+</script>
+</body>
+</html>
